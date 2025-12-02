@@ -2,28 +2,51 @@ name: Daily Commit
 
 on:
   schedule:
-    - cron: "0 0 * * *"
+    # Mon–Fri at 14:30 UTC  (≈ 8:00 PM IST)
+    - cron: "30 14 * * 1-5"
   workflow_dispatch:
 
 jobs:
   auto-commit:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
+      - name: Decide whether to commit today
+        id: decision
+        run: |
+          number=$((RANDOM % 10))
+          echo "Random number: $number"
+          # ~20% chance to skip committing (looks more natural)
+          if [ "$number" -lt 2 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip info
+        if: steps.decision.outputs.skip == 'true'
+        run: echo "Skipping commit today (randomly chosen)."
+
       - name: Checkout repository
+        if: steps.decision.outputs.skip == 'false'
         uses: actions/checkout@v4
 
       - name: Make a tiny change
+        if: steps.decision.outputs.skip == 'false'
         run: |
-          echo "Last run: $(date -u)" > last-run.txt
+          echo "Last run: $(date -u)" >> activity-log.txt
 
       - name: Commit changes
+        if: steps.decision.outputs.skip == 'false'
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
-          git add last-run.txt
-          git commit -m "chore: daily auto-commit" || echo "Nothing to commit"
+          git add activity-log.txt
+          git commit -m "Update activity log" || echo "Nothing to commit"
 
       - name: Push changes
+        if: steps.decision.outputs.skip == 'false'
         run: |
           git push
